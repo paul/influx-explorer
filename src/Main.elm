@@ -1,6 +1,6 @@
 import Html exposing (..)
---import Html.Attributes exposing (..)
-import Html.Events exposing (onClick)
+import Html.Attributes exposing (..)
+import Html.Events exposing (onClick, onInput)
 import Http
 import Json.Decode as Decode exposing (field)
 import Json.Decode.Extra exposing ((|:))
@@ -22,16 +22,19 @@ main =
 
 type alias Model =
     { query : String
-    , data : Maybe InfluxResults }
+    , data : Maybe (List InfluxResult)
+    , config : Config}
+
+type alias Config =
+  { url : String
+  , username : String
+  , password : String }
 
 init : String -> (Model, Cmd Msg)
 init query =
-  ( Model query Nothing
+  ( Model query Nothing (Config "" "" "")
   , Cmd.none
   )
-
-type alias InfluxResults =
-  List InfluxResult
 
 type alias InfluxResult =
   { series : List Series }
@@ -46,8 +49,7 @@ type alias Columns =
   List Column
 
 type alias Column =
-  { name: String
-  }
+  String
 
 type alias Rows =
   List Row
@@ -55,7 +57,8 @@ type alias Rows =
 type alias Row =
   List Value
 
-type alias Value = String
+type alias Value =
+  String
 
 
 -- UPDATE
@@ -63,7 +66,10 @@ type alias Value = String
 
 type Msg
     = LoadJson
-    | LoadedJson (Result Http.Error InfluxResults)
+    | LoadedJson (Result Http.Error (InfluxResult))
+    | Url String
+    | Username String
+    | Password String
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -78,6 +84,28 @@ update msg model =
         LoadedJson (Err _) ->
           (model, Cmd.none)
 
+        Url newUrl ->
+          let
+              oldConfig = model.config
+              newConfig = {oldConfig | url = newUrl}
+          in
+              ({ model | config = newConfig }, Cmd.none)
+
+        Username newUsername ->
+          let
+              oldConfig = model.config
+              newConfig = {oldConfig | username = newUsername}
+          in
+              ({ model | config = newConfig }, Cmd.none)
+
+        Password newPassword ->
+          let
+              oldConfig = model.config
+              newConfig = {oldConfig | password = newPassword}
+          in
+              ({ model | config = newConfig }, Cmd.none)
+
+
 
 -- VIEW
 
@@ -85,10 +113,37 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ text "Hello, world!"
-        , text (toString model.data)
-        , button [ onClick LoadJson ] [ text "Load" ]
+        [ h1 [] [ text "Hello, world!" ]
+        , h2 [] [ text "Config" ]
+        , div [] [
+          label [] [
+            text "Url"
+            , input [ type_ "text", onInput Url ] [ text model.config.url ]
+          ]
+          , label [] [
+            text "Username"
+            , input [ type_ "text", onInput Username ] [ text model.config.username ]
+          ]
+          , label [] [
+            text "Password"
+            , input [ type_ "text", onInput Password ] [ text model.config.password ]
+          ]
         ]
+        , button [ onClick LoadJson ] [ text "Load" ]
+        , text (toString model.data)
+        , table [] [
+          thead [] [
+            tr [] [
+              th [] [ text "header" ]
+            ]
+          ]
+          , tbody [] [
+            tr [] [
+              td [] [ text "cell" ]
+            ]
+          ]
+        ]
+      ]
 
 
 -- SUBSCRIPTIONS
@@ -119,55 +174,28 @@ getData query =
   in
       Http.send LoadedJson request
 
-decodeData : Decode.Decoder InfluxResults
+decodeData : Decode.Decoder (InfluxResult)
 decodeData =
   -- Decode.at ["results", "0", "series", "0", "columns", "0"] Decode.string
-  resultsDecoder
-
-resultsDecoder : Decode.Decoder InfluxResults
-resultsDecoder =
-  Decode.succeed InfluxResults
-    field "results" (Decode.list resultDecoder)
+  Decode.at ["results", "0"] resultDecoder
 
 resultDecoder : Decode.Decoder InfluxResult
 resultDecoder =
   Decode.succeed InfluxResult
-    field "series" (Decode.list seriesDecoder)
+  |: (field "series" (Decode.list seriesDecoder))
 
-seriesDecoder : Decode.Decoder (List Series)
+seriesDecoder : Decode.Decoder Series
 seriesDecoder =
-  Decode.map3 Series
-    (field "name" Decode.string)
-    (field "columns" (Decode.list columnsDecoder))
-    (field "values" (Decode.list rowsDecoder))
+  Decode.succeed Series
+    |: (field "name" Decode.string)
+    |: (field "columns" columnsDecoder)
+    |: (field "values" rowsDecoder)
 
 columnsDecoder : Decode.Decoder Columns
 columnsDecoder =
-  Decode.succeed Columns
-    field "columns" (Decode.list columnDecoder)
-
-columnDecoder : Decode.Decoder Column
-columnDecoder =
-  Decode.succeed Column
-    Column
+  Decode.list Decode.string
 
 rowsDecoder : Decode.Decoder Rows
 rowsDecoder =
-  Decode.succeed Rows
-    field "values" (Decode.list rowDecoder)
-
-rowDecoder : Decode.Decoder Row
-rowDecoder =
-  Decode.succeed Row
-    Decode.list valueDecoder
-
-valueDecoder : Decode.Decoder Value
-valueDecoder =
-  Decode.succeed Value
-    Decode.string
-
-
-
-
-
+  Decode.list (Decode.list Decode.string)
 
