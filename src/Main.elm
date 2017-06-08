@@ -5,6 +5,8 @@ import Http
 import Json.Decode as Decode exposing (field)
 import Json.Decode.Extra exposing ((|:))
 
+import BasicAuth
+
 
 
 main =
@@ -22,7 +24,7 @@ main =
 
 type alias Model =
     { query : String
-    , data : Maybe (List InfluxResult)
+    , data : Maybe (InfluxResult)
     , config : Config}
 
 type alias Config =
@@ -32,7 +34,7 @@ type alias Config =
 
 init : String -> (Model, Cmd Msg)
 init query =
-  ( Model query Nothing (Config "" "" "")
+  ( Model query Nothing (Config "https://influxdb.textus-staging.net" "textus" "42ajtsOVahJeFWDrp")
   , Cmd.none
   )
 
@@ -76,13 +78,13 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
         LoadJson ->
-          ( model, getData model.query )
-
-        LoadedJson (Ok newData) ->
-          ({ model | data = newData }, Cmd.none)
+          ( model, getData model )
 
         LoadedJson (Err _) ->
           (model, Cmd.none)
+
+        LoadedJson (Ok newData) ->
+          ({ model | data = Just newData }, Cmd.none)
 
         Url newUrl ->
           let
@@ -107,6 +109,7 @@ update msg model =
 
 
 
+
 -- VIEW
 
 
@@ -118,15 +121,15 @@ view model =
         , div [] [
           label [] [
             text "Url"
-            , input [ type_ "text", onInput Url ] [ text model.config.url ]
+            , input [ type_ "text", onInput Url, value model.config.url ] []
           ]
           , label [] [
             text "Username"
-            , input [ type_ "text", onInput Username ] [ text model.config.username ]
+            , input [ type_ "text", onInput Username, value model.config.username ] []
           ]
           , label [] [
             text "Password"
-            , input [ type_ "text", onInput Password ] [ text model.config.password ]
+            , input [ type_ "text", onInput Password, value model.config.password ] []
           ]
         ]
         , button [ onClick LoadJson ] [ text "Load" ]
@@ -155,16 +158,16 @@ subscriptions model =
 
 -- HTTP
 
-getData : String -> Cmd Msg
-getData query =
+getData : Model -> Cmd Msg
+getData model =
   let
       url =
-        "https://influxdb.textus-staging.net/query?db=telegraf&q=" ++ query
+        model.config.url ++ "/query?db=telegraf&q=" ++ model.query
       request =
         Http.request
           { method = "GET"
           , headers =
-            [ Http.header "Authorization" "Basic dGV4dHVzOjQyYWp0c09WYWhKZUZXRHJw" ]
+            [ BasicAuth.buildAuthorizationHeader model.config.username model.config.password ]
           , url = url
           , body = Http.emptyBody
           , expect = Http.expectJson decodeData
@@ -176,7 +179,6 @@ getData query =
 
 decodeData : Decode.Decoder (InfluxResult)
 decodeData =
-  -- Decode.at ["results", "0", "series", "0", "columns", "0"] Decode.string
   Decode.at ["results", "0"] resultDecoder
 
 resultDecoder : Decode.Decoder InfluxResult
