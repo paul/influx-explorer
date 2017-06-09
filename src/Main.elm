@@ -24,7 +24,7 @@ main =
 
 type alias Model =
     { query : String
-    , data : Maybe (InfluxResult)
+    , data : InfluxResults
     , config : Config}
 
 type alias Config =
@@ -34,9 +34,12 @@ type alias Config =
 
 init : String -> (Model, Cmd Msg)
 init query =
-  ( Model query Nothing (Config "https://influxdb.textus-staging.net" "textus" "42ajtsOVahJeFWDrp")
+  ( Model query [] (Config "https://influxdb.textus-staging.net" "textus" "")
   , Cmd.none
   )
+
+type alias InfluxResults =
+  List InfluxResult
 
 type alias InfluxResult =
   { series : List Series }
@@ -68,10 +71,11 @@ type alias Value =
 
 type Msg
     = LoadJson
-    | LoadedJson (Result Http.Error (InfluxResult))
+    | LoadedJson (Result Http.Error (InfluxResults))
     | Url String
     | Username String
     | Password String
+    | Query String
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -84,7 +88,7 @@ update msg model =
           (model, Cmd.none)
 
         LoadedJson (Ok newData) ->
-          ({ model | data = Just newData }, Cmd.none)
+          ({ model | data = newData }, Cmd.none)
 
         Url newUrl ->
           let
@@ -107,6 +111,9 @@ update msg model =
           in
               ({ model | config = newConfig }, Cmd.none)
 
+        Query newQuery ->
+          ({ model | query = newQuery }, Cmd.none)
+
 
 
 
@@ -116,37 +123,62 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ h1 [] [ text "Hello, world!" ]
+      <| [ h1 [] [ text "Hello, world!" ]
         , h2 [] [ text "Config" ]
-        , div [] [
-          label [] [
-            text "Url"
-            , input [ type_ "text", onInput Url, value model.config.url ] []
-          ]
+        , div []
+          [ label [] [
+              text "Url"
+              , input [ type_ "text", onInput Url, value model.config.url ] []
+            ]
           , label [] [
-            text "Username"
-            , input [ type_ "text", onInput Username, value model.config.username ] []
-          ]
+              text "Username"
+              , input [ type_ "text", onInput Username, value model.config.username ] []
+            ]
           , label [] [
-            text "Password"
-            , input [ type_ "text", onInput Password, value model.config.password ] []
+              text "Password"
+              , input [ type_ "text", onInput Password, value model.config.password ] []
+            ]
+          , label [] [
+              text "Query"
+              , input [ type_ "text", onInput Query, value model.query ] []
+            ]
           ]
-        ]
         , button [ onClick LoadJson ] [ text "Load" ]
-        , text (toString model.data)
-        , table [] [
-          thead [] [
-            tr [] [
-              th [] [ text "header" ]
-            ]
-          ]
-          , tbody [] [
-            tr [] [
-              td [] [ text "cell" ]
-            ]
-          ]
         ]
-      ]
+        ++ List.map renderTables model.data
+
+renderTables : InfluxResult -> Html Msg
+renderTables result =
+  div []
+    <| List.map renderTable result.series
+
+renderTable : Series -> Html Msg
+renderTable series =
+  div []
+    <| [ h2 [] [ text series.name ]
+       , table []
+         [ thead []
+           [ tr []
+             <| List.map renderColumnHeader series.columns
+           ]
+         , tbody []
+           <| List.map renderRow series.values
+         ]
+       ]
+
+renderColumnHeader : Column -> Html Msg
+renderColumnHeader column =
+  th [] [ text column ]
+
+renderRow : Row -> Html Msg
+renderRow row =
+  tr []
+    <| List.map renderCell row
+
+renderCell : Value -> Html Msg
+renderCell value =
+  td [] [ text value ]
+
 
 
 -- SUBSCRIPTIONS
@@ -177,9 +209,13 @@ getData model =
   in
       Http.send LoadedJson request
 
-decodeData : Decode.Decoder (InfluxResult)
+decodeData : Decode.Decoder (InfluxResults)
 decodeData =
-  Decode.at ["results", "0"] resultDecoder
+  Decode.at ["results"] resultsDecoder
+
+resultsDecoder : Decode.Decoder InfluxResults
+resultsDecoder =
+  Decode.list resultDecoder
 
 resultDecoder : Decode.Decoder InfluxResult
 resultDecoder =
