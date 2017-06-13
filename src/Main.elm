@@ -7,7 +7,9 @@ import Json.Decode.Extra exposing ((|:))
 import BasicAuth
 
 import ConfigStorage exposing (..)
+import LocalStorage exposing (..)
 
+main : Program Never Model Msg
 main =
     Html.program
         { init = init "SHOW MEASUREMENTS"
@@ -28,8 +30,8 @@ type alias Model =
 
 init : String -> (Model, Cmd Msg)
 init query =
-  ( Model query [] (Config "https://influxdb.textus-staging.net" "grafana" "")
-  , Cmd.none
+  ( Model query [] (ConfigStorage.initialConfig)
+  , LocalStorage.localStorageGet "config"
   )
 
 type alias InfluxResults =
@@ -121,7 +123,7 @@ update msg model =
           let
             (configModel, configCommand) = ConfigStorage.update configMessage model.config
           in
-            ({ model | config = configModel }, Cmd.map ConfigStorage.Message)
+            ({ model | config = configModel }, Cmd.map LoadConfig configCommand)
 
 
 

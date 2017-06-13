@@ -1,4 +1,4 @@
-module ConfigStorage exposing (Message, Config, subscriptions, saveConfig, update)
+module ConfigStorage exposing (Message, Config, initialConfig, subscriptions, saveConfig, update)
 
 import Json.Encode as JSONE
 import Json.Decode as JSOND exposing (field)
@@ -13,6 +13,13 @@ type alias Config =
 type Message
   = LoadConfig JSOND.Value
 
+initialConfig : Config
+initialConfig =
+  { url = ""
+  , username = ""
+  , password = ""
+  }
+
 update : Message -> Config -> (Config, Cmd Message)
 update message config =
   case message of
@@ -24,7 +31,7 @@ update message config =
           Ok config ->
             (config, Cmd.none)
           Err _ ->
-            (Config "" "" "", Cmd.none)
+            (initialConfig, Cmd.none)
 
 
 
