@@ -1,11 +1,9 @@
-port module ConfigStorage exposing (Message, Config, subscriptions, saveConfig, update)
+module ConfigStorage exposing (Message, Config, subscriptions, saveConfig, update)
 
 import Json.Encode as JSONE
 import Json.Decode as JSOND exposing (field)
 import Json.Decode.Extra exposing ((|:))
-
-type alias Key =
-  String
+import LocalStorage exposing (localStorageGet, localStorageSet, localStorageClear, localStorageResponse)
 
 type alias Config =
   { url : String
@@ -14,11 +12,6 @@ type alias Config =
 
 type Message
   = LoadConfig JSOND.Value
-
-port localStorageSet : (Key, JSONE.Value) -> Cmd message
-port localStorageGet : Key -> Cmd message
-port localStorageClear : String -> Cmd message
-port localStorageResponse : (JSOND.Value -> message) -> Sub message
 
 update : Message -> Config -> (Config, Cmd Message)
 update message config =

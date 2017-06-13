@@ -6,7 +6,7 @@ import Json.Decode as Decode exposing (field)
 import Json.Decode.Extra exposing ((|:))
 import BasicAuth
 
-import ConfigStorage exposing (Config)
+import ConfigStorage exposing (..)
 
 main =
     Html.program
@@ -121,7 +121,7 @@ update msg model =
           let
             (configModel, configCommand) = ConfigStorage.update configMessage model.config
           in
-            ({ model | config = configModel }, Cmd.map configMessage)
+            ({ model | config = configModel }, Cmd.map ConfigStorage.Message)
 
 
 
