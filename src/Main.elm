@@ -4,10 +4,9 @@ import Html.Events exposing (onClick, onInput)
 import Http
 import Json.Decode as Decode exposing (field)
 import Json.Decode.Extra exposing ((|:))
-import Json.Encode as Encode
 import BasicAuth
 
-import ConfigStorage
+import ConfigStorage exposing (Config)
 
 main =
     Html.program
@@ -26,11 +25,6 @@ type alias Model =
     { query : String
     , data : InfluxResults
     , config : Config}
-
-type alias Config =
-  { url : String
-  , username : String
-  , password : String }
 
 init : String -> (Model, Cmd Msg)
 init query =
@@ -78,14 +72,6 @@ type Msg
     | Query String
 
 
-encodeConfig : Config -> Encode.Value
-encodeConfig config =
-  Encode.object
-    [ ("url", Encode.string config.url),
-      ("username", Encode.string config.username),
-      ("password", Encode.string config.password)
-    ]
-
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -94,7 +80,7 @@ update msg model =
         LoadJson ->
           let
             commands = Cmd.batch
-              [ ConfigStorage.localStorageSet ("config", encodeConfig model.config)
+              [ ConfigStorage.localStorageSet ("config", ConfigStorage.encodeConfig model.config)
               , getData model
               ]
           in
