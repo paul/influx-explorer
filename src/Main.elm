@@ -70,6 +70,7 @@ type Msg
     | Username String
     | Password String
     | Query String
+    | LoadConfig ConfigStorage.Message
 
 
 
@@ -80,7 +81,7 @@ update msg model =
         LoadJson ->
           let
             commands = Cmd.batch
-              [ ConfigStorage.localStorageSet ("config", ConfigStorage.encodeConfig model.config)
+              [ ConfigStorage.saveConfig model.config
               , getData model
               ]
           in
@@ -115,6 +116,12 @@ update msg model =
 
         Query newQuery ->
           ({ model | query = newQuery }, Cmd.none)
+
+        LoadConfig configMessage ->
+          let
+            (configModel, configCommand) = ConfigStorage.update configMessage model.config
+          in
+            ({ model | config = configModel }, Cmd.map configMessage)
 
 
 
@@ -187,7 +194,7 @@ renderCell value =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-  Sub.none
+  Sub.map LoadConfig <| ConfigStorage.subscriptions model.config
 
 -- HTTP
 

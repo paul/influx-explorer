@@ -1,4 +1,4 @@
-port module ConfigStorage exposing (..)
+port module ConfigStorage exposing (Message, Config, subscriptions, saveConfig, update)
 
 import Json.Encode as JSONE
 import Json.Decode as JSOND exposing (field)
@@ -12,10 +12,32 @@ type alias Config =
   , username : String
   , password : String }
 
+type Message
+  = LoadConfig JSOND.Value
+
 port localStorageSet : (Key, JSONE.Value) -> Cmd message
 port localStorageGet : Key -> Cmd message
 port localStorageClear : String -> Cmd message
 port localStorageResponse : (JSOND.Value -> message) -> Sub message
+
+update : Message -> Config -> (Config, Cmd Message)
+update message config =
+  case message of
+    LoadConfig data ->
+      let
+        config = JSOND.decodeValue decodeConfig data
+      in
+        case config of
+          Ok config ->
+            (config, Cmd.none)
+          Err _ ->
+            (Config "" "" "", Cmd.none)
+
+
+
+saveConfig : Config -> Cmd message
+saveConfig config =
+  localStorageSet ("config", encodeConfig config)
 
 encodeConfig : Config -> JSONE.Value
 encodeConfig config =
@@ -25,9 +47,14 @@ encodeConfig config =
       ("password", JSONE.string config.password)
     ]
 
+
 decodeConfig : JSOND.Decoder Config
 decodeConfig =
   JSOND.succeed Config
     |: (field "url" JSOND.string)
     |: (field "username" JSOND.string)
     |: (field "password" JSOND.string)
+
+subscriptions : Config -> Sub Message
+subscriptions config =
+  localStorageResponse LoadConfig
