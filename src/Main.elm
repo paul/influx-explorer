@@ -4,10 +4,10 @@ import Html.Events exposing (onClick, onInput)
 import Http
 import Json.Decode as Decode exposing (field)
 import Json.Decode.Extra exposing ((|:))
-
+import Json.Encode as Encode
 import BasicAuth
 
-
+import ConfigStorage
 
 main =
     Html.program
@@ -34,7 +34,7 @@ type alias Config =
 
 init : String -> (Model, Cmd Msg)
 init query =
-  ( Model query [] (Config "https://influxdb.textus-staging.net" "textus" "")
+  ( Model query [] (Config "https://influxdb.textus-staging.net" "grafana" "")
   , Cmd.none
   )
 
@@ -78,11 +78,27 @@ type Msg
     | Query String
 
 
+encodeConfig : Config -> Encode.Value
+encodeConfig config =
+  Encode.object
+    [ ("url", Encode.string config.url),
+      ("username", Encode.string config.username),
+      ("password", Encode.string config.password)
+    ]
+
+
+
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
         LoadJson ->
-          ( model, getData model )
+          let
+            commands = Cmd.batch
+              [ ConfigStorage.localStorageSet ("config", encodeConfig model.config)
+              , getData model
+              ]
+          in
+            ( model, commands )
 
         LoadedJson (Err _) ->
           (model, Cmd.none)
@@ -123,8 +139,7 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-      <| [ h1 [] [ text "Hello, world!" ]
-        , h2 [] [ text "Config" ]
+      <| [ h2 [] [ text "Config" ]
         , div []
           [ label [] [
               text "Url"
@@ -136,7 +151,7 @@ view model =
             ]
           , label [] [
               text "Password"
-              , input [ type_ "text", onInput Password, value model.config.password ] []
+              , input [ type_ "password", onInput Password, value model.config.password ] []
             ]
           , label [] [
               text "Query"
